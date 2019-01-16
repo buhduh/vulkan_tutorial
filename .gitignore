@@ -1,0 +1,6 @@
+*.bak
+*.sw[a-z]
+bin/
+build/
+tutorialCode/
+vulkanTest/
