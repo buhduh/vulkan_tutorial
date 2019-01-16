@@ -13,11 +13,7 @@ void cleanUp() {
 int main() {
 	window = UX::Window{};
 	UX::initWindow(&window);
-	//vk = new Graphics::Vulkan(error, window.window);
-	//if(error != OK) {
-		//TODO what?
-		//exit(1);
-	//}
+	Vulkan vk(window.window);
 	while(!UX::run(&window)) {
 		int i = 0;
 	}
