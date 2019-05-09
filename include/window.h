@@ -4,13 +4,21 @@
 #define GLFW_INCLUDE_VULKAN
 #include <GLFW/glfw3.h>
 
-namespace UX {
-	struct Window {
-		GLFWwindow* window;
-	};
-	void initWindow(Window*);
-	bool run(Window*);
-	void cleanUp(Window*);
-}
+#include "utils.h"
+
+class Window : Uncopyable {
+public:
+	static Window& getWindow();
+	const GLFWwindow* getActualWindow() const;
+	bool run();
+	int height;
+	int width;
+private:
+	GLFWwindow* window;
+	Window();
+	~Window();
+	static const int DEF_WIDTH;
+	static const int DEF_HEIGHT;
+};
 
 #endif

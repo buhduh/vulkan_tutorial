@@ -5,9 +5,12 @@
 #include <vector>
 #include <string>
 
-class Vulkan {
+#include "utils.h"
+#include "window.h"
+
+class Vulkan : private Uncopyable {
 	public:
-		Vulkan(GLFWwindow*);
+		Vulkan(Window& window);
 		~Vulkan();
 		static VKAPI_ATTR VkBool32 VKAPI_CALL debugCallback(
 			VkDebugUtilsMessageSeverityFlagBitsEXT,
@@ -17,13 +20,18 @@ class Vulkan {
 		);
 	private:
 		//members
+		Window& window;
 		VkInstance instance;
 		VkPhysicalDevice physicalDevice;
 		VkDevice device;
 		VkQueue graphicsQueue;
 		VkQueue presentQueue;
 		VkSurfaceKHR surface;
+		VkSwapchainKHR swapChain;
+		VkFormat swapChainImageFormat;
 		VkDebugUtilsMessengerEXT* debugger;
+		std::vector<VkImage> swapChainImages;
+		std::vector<VkImageView> swapChainImageViews;
 
 		//static members
 		static const std::string NO_VULKAN_INSTANCE;
@@ -33,16 +41,41 @@ class Vulkan {
 		static const std::string NO_VULKAN_DEVICE;
 		static const std::string NO_VULKAN_INITIALIZATION;
 		static const std::string NO_VULKAN_DEBUGGER;
+		static const std::string NO_VULKAN_SURFACE_FORMATS;
+		static const std::string NO_VULKAN_SURFACE_PRESENT_MODES;
+		static const std::string NO_VULKAN_SWAP_CHAIN;
+		static const std::vector<const char*> deviceExtensions;
 
 		//functions
-		void initVulkan();
+		Vulkan (const Vulkan&);
+		Vulkan& operator=(const Vulkan&);
 		void createDebugger();
+		void createSwapChain();
 		void createInstance();
 		void selectSuitableDevice(const std::vector<VkPhysicalDevice>);
 		void getPhysicalDevice();
 		void createLogicalDeviceAndQueue();
+		void createSurface();
+		void createImageViews();
+		bool checkDeviceExtensionSupport(VkPhysicalDevice);
 		uint32_t pickQueueFamilyIndex();
-		void createSurface(GLFWwindow*);
-		std::vector<const char *> getDeviceExtensions() const;
+		uint32_t pickQueueFamilyIndex(VkPhysicalDevice);
+		struct SwapChainSupportDetails querySwapChainSupport(VkPhysicalDevice);
+		VkSurfaceFormatKHR chooseSwapSurfaceFormat(
+			const std::vector<VkSurfaceFormatKHR>&
+		);
+		VkPresentModeKHR chooseSwapPresentMode(
+			const std::vector<VkPresentModeKHR>
+		);
+		VkExtent2D chooseSwapExtent(
+			const VkSurfaceCapabilitiesKHR&
+		);
 };
+
+struct SwapChainSupportDetails {
+	VkSurfaceCapabilitiesKHR capabilities;
+	std::vector<VkSurfaceFormatKHR> formats;
+	std::vector<VkPresentModeKHR> presentModes;
+};
+
 #endif

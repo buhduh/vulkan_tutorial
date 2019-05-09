@@ -4,18 +4,10 @@
 #include "window.h"
 #include "graphics.h"
 
-UX::Window window;
-
-void cleanUp() {
-	UX::cleanUp(&window);
-}
-
+Window& window = Window::getWindow();
 int main() {
-	window = UX::Window{};
-	UX::initWindow(&window);
-	Vulkan vk(window.window);
-	while(!UX::run(&window)) {
+	Vulkan vk(window);
+	while(window.run()) {
 		int i = 0;
 	}
-	cleanUp();
 }
