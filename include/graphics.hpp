@@ -5,10 +5,10 @@
 #include <vector>
 #include <string>
 
-#include "utils.h"
-#include "window.h"
+#include "utils.hpp"
+#include "window.hpp"
 
-class Vulkan : private Uncopyable {
+class Vulkan : private utils::Uncopyable {
 	public:
 		Vulkan(Window& window);
 		~Vulkan();
@@ -44,6 +44,9 @@ class Vulkan : private Uncopyable {
 		static const std::string NO_VULKAN_SURFACE_FORMATS;
 		static const std::string NO_VULKAN_SURFACE_PRESENT_MODES;
 		static const std::string NO_VULKAN_SWAP_CHAIN;
+		static const std::string NO_VULKAN_SWAP_CHAIN_FORMAT;
+		static const std::string NO_VULKAN_IMAGE_VIEW;
+		static const std::string BAD_SHADER_MODULE;
 		static const std::vector<const char*> deviceExtensions;
 
 		//functions
@@ -57,6 +60,7 @@ class Vulkan : private Uncopyable {
 		void createLogicalDeviceAndQueue();
 		void createSurface();
 		void createImageViews();
+		void createGraphicsPipeline();
 		bool checkDeviceExtensionSupport(VkPhysicalDevice);
 		uint32_t pickQueueFamilyIndex();
 		uint32_t pickQueueFamilyIndex(VkPhysicalDevice);
@@ -70,6 +74,7 @@ class Vulkan : private Uncopyable {
 		VkExtent2D chooseSwapExtent(
 			const VkSurfaceCapabilitiesKHR&
 		);
+		VkShaderModule createShaderModule(const std::vector<char>& code);
 };
 
 struct SwapChainSupportDetails {

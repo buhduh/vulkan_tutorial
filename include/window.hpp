@@ -4,9 +4,9 @@
 #define GLFW_INCLUDE_VULKAN
 #include <GLFW/glfw3.h>
 
-#include "utils.h"
+#include "utils.hpp"
 
-class Window : Uncopyable {
+class Window : utils::Uncopyable {
 public:
 	static Window& getWindow();
 	const GLFWwindow* getActualWindow() const;

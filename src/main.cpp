@@ -1,8 +1,8 @@
 #include <cstdio>
 #include <cstdlib>
 
-#include "window.h"
-#include "graphics.h"
+#include "window.hpp"
+#include "graphics.hpp"
 
 Window& window = Window::getWindow();
 int main() {

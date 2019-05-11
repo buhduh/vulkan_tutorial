@@ -4,3 +4,5 @@ bin/
 build/
 tutorialCode/
 vulkanTest/
+tags
+shaders/*.spv

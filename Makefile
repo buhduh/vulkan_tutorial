@@ -22,6 +22,13 @@ spike: $(SPIKE_BIN)
 bin/%_spike: spike/%.cpp
 	g++ $(CFLAGS) -o $@ $^ $(LDFLAGS)
 
+#consider loading the tags file in vim
+tags: $(SRC)
+	@gcc -M $(CFLAGS) $^ include/graphics.hpp | \
+	sed -e 's/[\\ ]/\n/g' | \
+	sed -e '/^$$/d' -e '/\.o:[ \t]*$$/d' | \
+	ctags -L - --c++-kinds=+p --fields=+iaS --extra=+q
+
 clean:
 	rm -rf build/* bin/*
 

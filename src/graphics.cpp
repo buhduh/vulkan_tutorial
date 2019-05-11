@@ -4,8 +4,8 @@
 #include <iostream>
 #include <set>
 
-#include "applicationexception.h"
-#include "graphics.h"
+#include "applicationexception.hpp"
+#include "graphics.hpp"
 
 const std::string Vulkan::NO_VULKAN_INSTANCE("No Vulkan instance found.");
 const std::string Vulkan::NO_VULKAN_SURFACE("No Vulkan surface found.");
@@ -17,6 +17,9 @@ const std::string Vulkan::NO_VULKAN_DEBUGGER("Failed to create Vulkan debug call
 const std::string Vulkan::NO_VULKAN_SURFACE_FORMATS("No physical surface formats found.");
 const std::string Vulkan::NO_VULKAN_SURFACE_PRESENT_MODES("No physical device surface present modes.");
 const std::string Vulkan::NO_VULKAN_SWAP_CHAIN("Failed to create swap chain.");
+const std::string Vulkan::NO_VULKAN_SWAP_CHAIN_FORMAT("No vulkan swap chain formats found.");
+const std::string Vulkan::NO_VULKAN_IMAGE_VIEW("Failed creating a vulkan image view.");
+const std::string Vulkan::BAD_SHADER_MODULE("Failed creating creating shader module.");
 
 const std::vector<const char*> Vulkan::deviceExtensions = {
 	VK_KHR_SWAPCHAIN_EXTENSION_NAME
@@ -31,7 +34,7 @@ Vulkan::Vulkan(Window& window)
 		, presentQueue(VK_NULL_HANDLE)
 		, surface(VK_NULL_HANDLE)
 		, swapChain(VK_NULL_HANDLE)
-		, swapChainImageFormat(VK_NULL_HANDLE)
+		, swapChainImageFormat(VK_FORMAT_UNDEFINED)
 		, swapChainImages(0)
 		, swapChainImageViews(0)
 		, window(window) {
@@ -44,14 +47,110 @@ Vulkan::Vulkan(Window& window)
 	createLogicalDeviceAndQueue();
 	createSwapChain();
 	createImageViews();
+	createGraphicsPipeline();
 }
 
 //TODO debug flag
 Vulkan::~Vulkan() {
+	for(auto i : swapChainImageViews) {
+		vkDestroyImageView(device, i, nullptr);
+	}
 	vkDestroySwapchainKHR(device, swapChain, nullptr);
 	vkDestroySurfaceKHR(this->instance, this->surface, nullptr);
 	free(this->debugger);
 	vkDestroyInstance(this->instance, nullptr);
+}
+
+VkShaderModule Vulkan::createShaderModule(const std::vector<char>& code) {
+	VkShaderModuleCreateInfo createInfo = {};
+	createInfo.sType = VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO;
+	createInfo.codeSize = code.size();
+	createInfo.pCode = reinterpret_cast<const uint32_t*>(code.data());
+	VkShaderModule shaderModule;
+	if(vkCreateShaderModule(device, &createInfo, nullptr, &shaderModule) != VK_SUCCESS) {
+		throw ApplicationVulkanException(BAD_SHADER_MODULE);		
+	}
+	return shaderModule;
+}
+
+void Vulkan::createGraphicsPipeline() {
+    auto vertShaderCode = utils::readFile("shaders/vert.spv");
+    auto fragShaderCode = utils::readFile("shaders/frag.spv");
+	VkShaderModule vertShaderModule = createShaderModule(vertShaderCode);
+	VkShaderModule fragShaderModule = createShaderModule(fragShaderCode);
+
+	VkPipelineShaderStageCreateInfo vertShaderStageInfo = {};
+	vertShaderStageInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
+	vertShaderStageInfo.stage = VK_SHADER_STAGE_VERTEX_BIT;
+	vertShaderStageInfo.module = vertShaderModule;
+	vertShaderStageInfo.pName = "main";
+
+	VkPipelineShaderStageCreateInfo fragShaderStageInfo = {};
+	fragShaderStageInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
+	fragShaderStageInfo.stage = VK_SHADER_STAGE_FRAGMENT_BIT;
+	fragShaderStageInfo.module = fragShaderModule;
+	fragShaderStageInfo.pName = "main";
+
+	VkPipelineShaderStageCreateInfo shaderStages[] = {
+		vertShaderStageInfo, fragShaderStageInfo
+	};
+
+	VkPipelineVertexInputStateCreateInfo vInputInfo = {};
+	vInputInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO;
+	vInputInfo.vertexBindingDescriptionCount = 0;
+	vInputInfo.pVertexBindingDescriptions = nullptr;
+	vInputInfo.vertexAttributeDescriptionCount = 0;
+	vInputInfo.pVertexAttributeDescriptions = nullptr;
+
+	VkPipelineInputAssemblyStateCreateInfo inputAssembly = {};
+	inputAssembly.sType = VK_STRUCTURE_TYPE_PIPELINE_INPUT_ASSEMBLY_STATE_CREATE_INFO;
+	inputAssembly.topology = VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST;
+	inputAssembly.primitiveRestartEnable = VK_FALSE;
+
+	VkViewport viewport = {};
+	viewport.x = 0.0f;
+	viewport.y = 0.0f;
+	viewport.width = (float) swapChainExtent.width;
+	viewport.height = (float) swapChainExtent.height;
+	viewport.minDepth = 0.0f;
+	viewport.maxDepth = 1.0f;
+
+	VkRect2D scissor = {};
+	scissor.offset = {0, 0};
+	scissor.extent = swapChainExtent;
+
+	VkPipelineViewportStateCreateInfo viewportState = {};
+	viewportState.sType = VK_STRUCTURE_TYPE_PIPELINE_VIEWPORT_STATE_CREATE_INFO;
+	viewportState.viewportCount = 1;
+	viewportState.pViewports = &viewport;
+	viewportState.scissorCount = 1;
+	viewportState.pScissors = &scissor;
+
+	VkPipelineRasterizationStateCreateInfo rasterizer = {};
+	rasterizer.sType = VK_STRUCTURE_TYPE_PIPELINE_RASTERIZATION_STATE_CREATE_INFO;
+	rasterizer.depthClampEnable = VK_FALSE;
+	rasterizer.rasterizerDiscardEnable = VK_FALSE;
+	rasterizer.polygonMode = VK_POLYGON_MODE_FILL;
+	rasterizer.lineWidth = 1.0f;
+	rasterizer.cullMode = VK_CULL_MODE_BACK_BIT;
+	rasterizer.frontFace = VK_FRONT_FACE_CLOCKWISE;
+	rasterizer.depthBiasEnable = VK_FALSE;
+	rasterizer.depthBiasConstantFactor = 0.0f; // Optional
+	rasterizer.depthBiasClamp = 0.0f; // Optional
+	rasterizer.depthBiasSlopeFactor = 0.0f; // Optional
+
+	VkPipelineMultisampleStateCreateInfo multisampling = {};
+	multisampling.sType = VK_STRUCTURE_TYPE_PIPELINE_MULTISAMPLE_STATE_CREATE_INFO;
+	multisampling.sampleShadingEnable = VK_FALSE;
+	multisampling.rasterizationSamples = VK_SAMPLE_COUNT_1_BIT;
+	multisampling.minSampleShading = 1.0f; // Optional
+	multisampling.pSampleMask = nullptr; // Optional
+	multisampling.alphaToCoverageEnable = VK_FALSE; // Optional
+	multisampling.alphaToOneEnable = VK_FALSE; // Optional
+
+
+	vkDestroyShaderModule(device, fragShaderModule, nullptr);
+	vkDestroyShaderModule(device, vertShaderModule, nullptr);
 }
 
 void Vulkan::createImageViews() {
@@ -61,17 +160,31 @@ void Vulkan::createImageViews() {
 	if(swapChainImages.size() == 0) {
 		throw ApplicationVulkanException(NO_VULKAN_SWAP_CHAIN);
 	}
+	if(swapChainImageFormat == VK_FORMAT_UNDEFINED) {
+		throw ApplicationVulkanException(NO_VULKAN_SWAP_CHAIN);
+	}
 	swapChainImageViews.resize(swapChainImages.size());
-	for(auto i : swapChainImages) {
+	//TODO i have no idea if setting 
+	for(uint32_t i = 0; i < swapChainImages.size(); ++i) {
 		VkImageViewCreateInfo cInfo = {};
 		cInfo.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
-		cInfo.image = i;
+		cInfo.image = swapChainImages[i];
 		cInfo.viewType = VK_IMAGE_VIEW_TYPE_2D;
 		cInfo.format = swapChainImageFormat;
 		cInfo.components.r = VK_COMPONENT_SWIZZLE_IDENTITY;
 		cInfo.components.g = VK_COMPONENT_SWIZZLE_IDENTITY;
 		cInfo.components.b = VK_COMPONENT_SWIZZLE_IDENTITY;
 		cInfo.components.a = VK_COMPONENT_SWIZZLE_IDENTITY;
+		cInfo.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+		cInfo.subresourceRange.baseMipLevel = 0;
+		cInfo.subresourceRange.levelCount = 1;
+		cInfo.subresourceRange.baseArrayLayer = 0;
+		cInfo.subresourceRange.layerCount = 1;
+		if(vkCreateImageView(
+			device, &cInfo, nullptr, 
+			&swapChainImageViews[i]) != VK_SUCCESS) {
+			throw ApplicationVulkanException(NO_VULKAN_IMAGE_VIEW);
+		}
 	}
 }
 
