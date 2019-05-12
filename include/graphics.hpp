@@ -18,6 +18,8 @@ class Vulkan : private utils::Uncopyable {
 			const VkDebugUtilsMessengerCallbackDataEXT*,
 			void*
 		);
+		void drawFrame();
+		void waitIdle();
 	private:
 		//members
 		Window& window;
@@ -29,9 +31,20 @@ class Vulkan : private utils::Uncopyable {
 		VkSurfaceKHR surface;
 		VkSwapchainKHR swapChain;
 		VkFormat swapChainImageFormat;
+		VkExtent2D swapChainExtent;
+		VkPipelineLayout pipelineLayout;
+		VkRenderPass renderPass;
+		VkPipeline graphicsPipeline;
+		VkCommandPool commandPool;
+		size_t currentFrame;
+		std::vector<VkSemaphore> imageAvailableSemaphores;
+		std::vector<VkSemaphore> renderFinishedSemaphores;
+		std::vector<VkFence> inFlightFences;
 		VkDebugUtilsMessengerEXT* debugger;
 		std::vector<VkImage> swapChainImages;
 		std::vector<VkImageView> swapChainImageViews;
+		std::vector<VkFramebuffer> swapChainFramebuffers;
+		std::vector<VkCommandBuffer> commandBuffers;
 
 		//static members
 		static const std::string NO_VULKAN_INSTANCE;
@@ -48,6 +61,7 @@ class Vulkan : private utils::Uncopyable {
 		static const std::string NO_VULKAN_IMAGE_VIEW;
 		static const std::string BAD_SHADER_MODULE;
 		static const std::vector<const char*> deviceExtensions;
+		static const size_t MAX_FRAMES_IN_FLIGHT;
 
 		//functions
 		Vulkan (const Vulkan&);
@@ -55,12 +69,17 @@ class Vulkan : private utils::Uncopyable {
 		void createDebugger();
 		void createSwapChain();
 		void createInstance();
+		void createRenderPass();
 		void selectSuitableDevice(const std::vector<VkPhysicalDevice>);
 		void getPhysicalDevice();
 		void createLogicalDeviceAndQueue();
 		void createSurface();
 		void createImageViews();
 		void createGraphicsPipeline();
+		void createFramebuffers();
+		void createCommandPool();
+		void createCommandBuffers();
+		void createSyncObjects();
 		bool checkDeviceExtensionSupport(VkPhysicalDevice);
 		uint32_t pickQueueFamilyIndex();
 		uint32_t pickQueueFamilyIndex(VkPhysicalDevice);
