@@ -19,7 +19,7 @@ Window::Window() {
 	glfwWindowHint(GLFW_BLUE_BITS, mode->blueBits);
 	glfwWindowHint(GLFW_REFRESH_RATE, mode->refreshRate);
 	this->window = glfwCreateWindow(DEF_WIDTH, DEF_HEIGHT, "Vulkan window", nullptr, nullptr);
-	glfwGetWindowSize(this->window, &this->width, &this->height);
+	glfwGetFramebufferSize(this->window, &this->width, &this->height);
 	//window->window = glfwCreateWindow(mode->width, mode->height, "Vulkan window", monitor, nullptr);
 }
 
@@ -35,6 +35,24 @@ const GLFWwindow* Window::getActualWindow() const {
 bool Window::run() {
 	glfwPollEvents();
 	return !glfwWindowShouldClose(this->window);
+}
+
+//TODO is this even working?
+//this is fucked
+/*
+void Window::setupResizeFunc(std::function<void(GLFWwindow*, int, int)> cb) {
+	don't think i need a lambda
+	glfwSetFramebufferSizeCallback(window, [&, this](){
+		cb();	
+	});
+	glfwSetFramebufferSizeCallback(window, (GLFWframebuffersizefun)cb;
+}
+*/
+
+void Window::getFrameBufferSize(int* t_width, int* t_height) {
+	glfwGetFramebufferSize(window, t_width, t_height);
+	width = *t_width;
+	height = *t_height;
 }
 
 Window::~Window() {

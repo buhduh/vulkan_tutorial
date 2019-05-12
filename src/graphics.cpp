@@ -50,9 +50,11 @@ Vulkan::Vulkan(Window& window)
 		, renderFinishedSemaphores(0)
 		, currentFrame(0)
 		, inFlightFences(0)
+		, frameBufferResized(false)
 		, window(window) {
 	this->debugger = (VkDebugUtilsMessengerEXT*) 
 		malloc(sizeof(VkDebugUtilsMessengerEXT));
+	//setupResizeFunc();		
 	createInstance();
 	createSurface();
 	createDebugger();
@@ -70,15 +72,37 @@ Vulkan::Vulkan(Window& window)
 
 //TODO debug flag
 Vulkan::~Vulkan() {
+	cleanupSwapChain();
 	for(size_t i = 0; i < MAX_FRAMES_IN_FLIGHT; ++i) {
 		vkDestroySemaphore(device, renderFinishedSemaphores[i], nullptr);
 		vkDestroySemaphore(device, imageAvailableSemaphores[i], nullptr);
 		vkDestroyFence(device, inFlightFences[i], nullptr);
 	}
 	vkDestroyCommandPool(device, commandPool, nullptr);
+	vkDestroyDevice(device, nullptr);
+	free(this->debugger);
+	vkDestroySurfaceKHR(this->instance, this->surface, nullptr);
+	vkDestroyInstance(this->instance, nullptr);
+}
+
+//TODO i should log this, no idea if it works..
+//TODO, this is fucked
+/*
+void Vulkan::setupResizeFunc() {
+	window.setupResizeFunc([&, this](GLFWwindow*, int, int){
+		frameBufferResized = true;
+	});
+}
+*/
+
+void Vulkan::cleanupSwapChain() {
 	for(auto framebuffer : swapChainFramebuffers) {
 		vkDestroyFramebuffer(device, framebuffer, nullptr);
     }
+	vkFreeCommandBuffers(
+		device, commandPool, 
+		static_cast<uint32_t>(commandBuffers.size()), commandBuffers.data()
+	);
 	vkDestroyPipeline(device, graphicsPipeline, nullptr);
 	vkDestroyPipelineLayout(device, pipelineLayout, nullptr);
 	vkDestroyRenderPass(device, renderPass, nullptr);
@@ -86,9 +110,17 @@ Vulkan::~Vulkan() {
 		vkDestroyImageView(device, i, nullptr);
 	}
 	vkDestroySwapchainKHR(device, swapChain, nullptr);
-	vkDestroySurfaceKHR(this->instance, this->surface, nullptr);
-	free(this->debugger);
-	vkDestroyInstance(this->instance, nullptr);
+}
+
+void Vulkan::recreateSwapChain() {
+	vkDeviceWaitIdle(device);
+	cleanupSwapChain();
+	createSwapChain();
+	createImageViews();
+	createRenderPass();
+	createGraphicsPipeline();
+	createFramebuffers();
+	createCommandBuffers();
 }
 
 void Vulkan::waitIdle() {
@@ -100,12 +132,21 @@ void Vulkan::drawFrame() {
 		device, 1, &inFlightFences[currentFrame], 
 		VK_TRUE, std::numeric_limits<uint64_t>::max()
 	);
-	vkResetFences(device, 1, &inFlightFences[currentFrame]);
     uint32_t imageIndex;
-    vkAcquireNextImageKHR(
+    auto res = vkAcquireNextImageKHR(
 		device, swapChain, std::numeric_limits<uint64_t>::max(), 
 		imageAvailableSemaphores[currentFrame], VK_NULL_HANDLE, &imageIndex
 	);
+	//TODO This is ALWAYS suboptimal, i should probably fix this
+	//if(res == VK_ERROR_OUT_OF_DATE_KHR || VK_SUBOPTIMAL_KHR) {
+	if(res == VK_ERROR_OUT_OF_DATE_KHR) {
+		//TODO should I print something?
+		recreateSwapChain();
+		return;
+	}
+	if(res != VK_SUCCESS) {
+		throw std::runtime_error("Failed acquiring next swap chain image.");
+	}
 
 	VkSubmitInfo submitInfo = {};
 	submitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
@@ -121,8 +162,8 @@ void Vulkan::drawFrame() {
 
 	VkSemaphore signalSemaphores[] = {renderFinishedSemaphores[currentFrame]};
 	submitInfo.signalSemaphoreCount = 1;
-
 	submitInfo.pSignalSemaphores = signalSemaphores;
+	vkResetFences(device, 1, &inFlightFences[currentFrame]);
 	if(
 		vkQueueSubmit(
 			graphicsQueue, 1, &submitInfo, 
@@ -140,7 +181,13 @@ void Vulkan::drawFrame() {
 	presentInfo.pImageIndices = &imageIndex;
 	presentInfo.pResults = nullptr; // Optional
 
-	vkQueuePresentKHR(presentQueue, &presentInfo);
+	res = vkQueuePresentKHR(presentQueue, &presentInfo);
+	if(res == VK_ERROR_OUT_OF_DATE_KHR || res == VK_SUBOPTIMAL_KHR || frameBufferResized) {
+		frameBufferResized = false;
+		recreateSwapChain();
+	} else if(res != VK_SUCCESS) { 
+		throw std::runtime_error("Failed to present swap chain.");
+	}
 	vkQueueWaitIdle(presentQueue);
 
 	currentFrame = (currentFrame + 1) % MAX_FRAMES_IN_FLIGHT;
@@ -713,8 +760,10 @@ VkExtent2D Vulkan::chooseSwapExtent(
 	    if(capabilities.currentExtent.width != std::numeric_limits<uint32_t>::max()) {
         return capabilities.currentExtent;
     } else {
-		uint32_t width = static_cast<uint32_t>(window.width);
-		uint32_t height = static_cast<uint32_t>(window.height);
+		int iWidth, iHeight;
+		window.getFrameBufferSize(&iWidth, &iHeight);
+		uint32_t width = static_cast<uint32_t>(iWidth);
+		uint32_t height = static_cast<uint32_t>(iHeight);
         VkExtent2D actualExtent = {width, height};
         actualExtent.width = std::max(capabilities.minImageExtent.width, std::min(capabilities.maxImageExtent.width, actualExtent.width));
         actualExtent.height = std::max(capabilities.minImageExtent.height, std::min(capabilities.maxImageExtent.height, actualExtent.height));

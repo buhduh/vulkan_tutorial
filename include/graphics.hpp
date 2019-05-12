@@ -20,6 +20,7 @@ class Vulkan : private utils::Uncopyable {
 		);
 		void drawFrame();
 		void waitIdle();
+		//void setupResizeFunc();
 	private:
 		//members
 		Window& window;
@@ -36,6 +37,7 @@ class Vulkan : private utils::Uncopyable {
 		VkRenderPass renderPass;
 		VkPipeline graphicsPipeline;
 		VkCommandPool commandPool;
+		bool frameBufferResized;
 		size_t currentFrame;
 		std::vector<VkSemaphore> imageAvailableSemaphores;
 		std::vector<VkSemaphore> renderFinishedSemaphores;
@@ -80,6 +82,8 @@ class Vulkan : private utils::Uncopyable {
 		void createCommandPool();
 		void createCommandBuffers();
 		void createSyncObjects();
+		void recreateSwapChain();
+		void cleanupSwapChain();
 		bool checkDeviceExtensionSupport(VkPhysicalDevice);
 		uint32_t pickQueueFamilyIndex();
 		uint32_t pickQueueFamilyIndex(VkPhysicalDevice);
