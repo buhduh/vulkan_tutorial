@@ -1,4 +1,4 @@
-CFLAGS = -std=c++17 -I$(VULKAN_SDK_PATH)/include -Iinclude
+CFLAGS = -std=c++17 -I$(VULKAN_SDK_PATH)/include -Iinclude -I$(HOME)/include
 LDFLAGS = -L$(VULKAN_SDK_PATH)/lib `pkg-config --static --libs glfw3` -lvulkan
 
 SPIKE_SRC = $(wildcard spike/*.cpp)

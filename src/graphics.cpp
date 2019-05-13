@@ -27,6 +27,12 @@ const std::vector<const char*> Vulkan::deviceExtensions = {
 	VK_KHR_SWAPCHAIN_EXTENSION_NAME
 };
 
+const std::vector<Vertex> Vulkan::vertices = {
+	{{0.0f, -0.5f}, {1.0f, 0.0f, 0.0f}},
+	{{0.5f, 0.5f}, {0.0f, 1.0f, 0.0f}},
+	{{-0.5f, 0.5f}, {0.0f, 0.0f, 1.0f}}
+};
+
 //TODO debug flags!!!!
 Vulkan::Vulkan(Window& window)
 		: instance(VK_NULL_HANDLE)
@@ -51,6 +57,8 @@ Vulkan::Vulkan(Window& window)
 		, currentFrame(0)
 		, inFlightFences(0)
 		, frameBufferResized(false)
+		, vertexBuffer(VK_NULL_HANDLE)
+		, vertexBufferMemory(VK_NULL_HANDLE)
 		, window(window) {
 	this->debugger = (VkDebugUtilsMessengerEXT*) 
 		malloc(sizeof(VkDebugUtilsMessengerEXT));
@@ -66,6 +74,7 @@ Vulkan::Vulkan(Window& window)
 	createGraphicsPipeline();
 	createFramebuffers();
 	createCommandPool();
+	createVertexBuffer();
 	createCommandBuffers();
 	createSyncObjects();
 }
@@ -73,6 +82,8 @@ Vulkan::Vulkan(Window& window)
 //TODO debug flag
 Vulkan::~Vulkan() {
 	cleanupSwapChain();
+	vkDestroyBuffer(device, vertexBuffer, nullptr);
+	vkFreeMemory(device, vertexBufferMemory, nullptr);
 	for(size_t i = 0; i < MAX_FRAMES_IN_FLIGHT; ++i) {
 		vkDestroySemaphore(device, renderFinishedSemaphores[i], nullptr);
 		vkDestroySemaphore(device, imageAvailableSemaphores[i], nullptr);
@@ -85,6 +96,21 @@ Vulkan::~Vulkan() {
 	vkDestroyInstance(this->instance, nullptr);
 }
 
+uint32_t Vulkan::findMemoryType(uint32_t typeFilter, VkMemoryPropertyFlags properties) {
+	VkPhysicalDeviceMemoryProperties memProperties;
+	vkGetPhysicalDeviceMemoryProperties(physicalDevice, &memProperties);
+	for(uint32_t i = 0; i < memProperties.memoryTypeCount; i++) {
+		if(
+			(typeFilter & (1 << i)) && 
+			(memProperties.memoryTypes[i].propertyFlags & properties) == properties
+			) {
+			return i;
+		}
+	}
+	throw std::runtime_error("failed to find suitable memory type!");
+}
+
+
 //TODO i should log this, no idea if it works..
 //TODO, this is fucked
 /*
@@ -94,6 +120,42 @@ void Vulkan::setupResizeFunc() {
 	});
 }
 */
+
+void Vulkan::createVertexBuffer() {
+	VkBufferCreateInfo bufferInfo = {};
+	bufferInfo.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
+	bufferInfo.size = sizeof(Vulkan::vertices[0]) * Vulkan::vertices.size();
+	bufferInfo.usage = VK_BUFFER_USAGE_VERTEX_BUFFER_BIT;
+	bufferInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
+	if(
+		vkCreateBuffer(
+			device, &bufferInfo, nullptr, 
+			&vertexBuffer) != VK_SUCCESS
+		) {
+        throw std::runtime_error("failed to create vertex buffer!");
+    }
+	VkMemoryRequirements memRequirements;
+	vkGetBufferMemoryRequirements(device, vertexBuffer, &memRequirements);
+	VkMemoryAllocateInfo allocInfo = {};
+	allocInfo.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
+	allocInfo.allocationSize = memRequirements.size;
+	allocInfo.memoryTypeIndex = findMemoryType(
+		memRequirements.memoryTypeBits, 
+		VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT
+	);
+	if(
+		vkAllocateMemory(
+			device, &allocInfo, nullptr, 
+			&vertexBufferMemory) != VK_SUCCESS
+		) {
+		throw std::runtime_error("failed to allocate vertex buffer memory!");
+	}
+	vkBindBufferMemory(device, vertexBuffer, vertexBufferMemory, 0);
+	void* data;
+	vkMapMemory(device, vertexBufferMemory, 0, bufferInfo.size, 0, &data);
+	memcpy(data, Vulkan::vertices.data(), (size_t) bufferInfo.size);
+	vkUnmapMemory(device, vertexBufferMemory);
+}
 
 void Vulkan::cleanupSwapChain() {
 	for(auto framebuffer : swapChainFramebuffers) {
@@ -266,7 +328,14 @@ void Vulkan::createCommandBuffers() {
 		vkCmdBindPipeline(
 			commandBuffers[i], VK_PIPELINE_BIND_POINT_GRAPHICS, graphicsPipeline
 		);
-		vkCmdDraw(commandBuffers[i], 3, 1, 0, 0);
+		VkBuffer vertexBuffers[] = {vertexBuffer};
+		VkDeviceSize offsets[] = {0};
+		vkCmdBindVertexBuffers(commandBuffers[i], 0, 1, vertexBuffers, offsets);
+		vkCmdDraw(
+			commandBuffers[i], 
+			static_cast<uint32_t>(Vulkan::vertices.size()), 
+			1, 0, 0
+		);
 		vkCmdEndRenderPass(commandBuffers[i]);
 		if(vkEndCommandBuffer(commandBuffers[i]) != VK_SUCCESS) {
 			throw std::runtime_error("failed to record command buffer!");
@@ -398,12 +467,16 @@ void Vulkan::createGraphicsPipeline() {
 		vertShaderStageInfo, fragShaderStageInfo
 	};
 
+	auto bindingDescription = Vertex::getBindingDescription();
+	auto attributeDescriptions = Vertex::getAttributeDescriptions();
+
 	VkPipelineVertexInputStateCreateInfo vInputInfo = {};
 	vInputInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO;
-	vInputInfo.vertexBindingDescriptionCount = 0;
-	vInputInfo.pVertexBindingDescriptions = nullptr;
-	vInputInfo.vertexAttributeDescriptionCount = 0;
-	vInputInfo.pVertexAttributeDescriptions = nullptr;
+	vInputInfo.vertexBindingDescriptionCount = 1;
+	vInputInfo.vertexAttributeDescriptionCount = 
+		static_cast<uint32_t>(attributeDescriptions.size());
+	vInputInfo.pVertexBindingDescriptions = &bindingDescription;
+	vInputInfo.pVertexAttributeDescriptions = attributeDescriptions.data();
 
 	VkPipelineInputAssemblyStateCreateInfo inputAssembly = {};
 	inputAssembly.sType = VK_STRUCTURE_TYPE_PIPELINE_INPUT_ASSEMBLY_STATE_CREATE_INFO;

@@ -1,9 +1,12 @@
 #ifndef GRAPHICS_H
 #define GRAPHICS_H
 
-#include <vulkan/vulkan.h>
 #include <vector>
 #include <string>
+#include <array>
+
+#include <glm/glm.hpp>
+#include <vulkan/vulkan.h>
 
 #include "utils.hpp"
 #include "window.hpp"
@@ -36,6 +39,8 @@ class Vulkan : private utils::Uncopyable {
 		VkPipelineLayout pipelineLayout;
 		VkRenderPass renderPass;
 		VkPipeline graphicsPipeline;
+		VkBuffer vertexBuffer;
+		VkDeviceMemory vertexBufferMemory;
 		VkCommandPool commandPool;
 		bool frameBufferResized;
 		size_t currentFrame;
@@ -64,6 +69,7 @@ class Vulkan : private utils::Uncopyable {
 		static const std::string BAD_SHADER_MODULE;
 		static const std::vector<const char*> deviceExtensions;
 		static const size_t MAX_FRAMES_IN_FLIGHT;
+		static const std::vector<struct Vertex> vertices;
 
 		//functions
 		Vulkan (const Vulkan&);
@@ -84,6 +90,8 @@ class Vulkan : private utils::Uncopyable {
 		void createSyncObjects();
 		void recreateSwapChain();
 		void cleanupSwapChain();
+		void createVertexBuffer();
+		uint32_t findMemoryType(uint32_t, VkMemoryPropertyFlags);
 		bool checkDeviceExtensionSupport(VkPhysicalDevice);
 		uint32_t pickQueueFamilyIndex();
 		uint32_t pickQueueFamilyIndex(VkPhysicalDevice);
@@ -98,6 +106,31 @@ class Vulkan : private utils::Uncopyable {
 			const VkSurfaceCapabilitiesKHR&
 		);
 		VkShaderModule createShaderModule(const std::vector<char>& code);
+};
+
+struct Vertex {	
+	glm::vec2 pos;
+	glm::vec3 color;
+	static VkVertexInputBindingDescription getBindingDescription() {
+		VkVertexInputBindingDescription bindingDescription = {};
+		bindingDescription.binding = 0;
+		bindingDescription.stride = sizeof(Vertex);
+		bindingDescription.inputRate = VK_VERTEX_INPUT_RATE_VERTEX;
+		return bindingDescription;
+	}
+	static std::array<VkVertexInputAttributeDescription, 2> getAttributeDescriptions() {
+		std::array<VkVertexInputAttributeDescription, 2> attributeDescriptions = {};
+		attributeDescriptions[0].binding = 0;
+		attributeDescriptions[0].location = 0;
+		attributeDescriptions[0].format = VK_FORMAT_R32G32_SFLOAT;
+		attributeDescriptions[0].offset = offsetof(Vertex, pos);
+		attributeDescriptions[1].binding = 0;
+		attributeDescriptions[1].location = 1;
+		attributeDescriptions[1].format = VK_FORMAT_R32G32B32_SFLOAT;
+		attributeDescriptions[1].offset = offsetof(Vertex, color);
+		return attributeDescriptions;
+	}
+
 };
 
 struct SwapChainSupportDetails {
