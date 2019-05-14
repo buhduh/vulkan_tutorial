@@ -41,6 +41,8 @@ class Vulkan : private utils::Uncopyable {
 		VkPipeline graphicsPipeline;
 		VkBuffer vertexBuffer;
 		VkDeviceMemory vertexBufferMemory;
+		VkBuffer indexBuffer;
+		VkDeviceMemory indexBufferMemory;
 		VkCommandPool commandPool;
 		bool frameBufferResized;
 		size_t currentFrame;
@@ -70,6 +72,7 @@ class Vulkan : private utils::Uncopyable {
 		static const std::vector<const char*> deviceExtensions;
 		static const size_t MAX_FRAMES_IN_FLIGHT;
 		static const std::vector<struct Vertex> vertices;
+		static const std::vector<uint16_t> indices;
 
 		//functions
 		Vulkan (const Vulkan&);
@@ -91,6 +94,12 @@ class Vulkan : private utils::Uncopyable {
 		void recreateSwapChain();
 		void cleanupSwapChain();
 		void createVertexBuffer();
+		void createIndexBuffer();
+		void createBuffer(
+			VkDeviceSize, VkBufferUsageFlags, VkMemoryPropertyFlags, 
+			VkBuffer&, VkDeviceMemory&
+		);
+		void copyBuffer(VkBuffer, VkBuffer, VkDeviceSize);
 		uint32_t findMemoryType(uint32_t, VkMemoryPropertyFlags);
 		bool checkDeviceExtensionSupport(VkPhysicalDevice);
 		uint32_t pickQueueFamilyIndex();
