@@ -4,8 +4,11 @@
 #include <vector>
 #include <string>
 #include <array>
+#include <chrono>
 
+#define GLM_FORCE_RADIANS
 #include <glm/glm.hpp>
+#include <glm/gtc/matrix_transform.hpp>
 #include <vulkan/vulkan.h>
 
 #include "utils.hpp"
@@ -44,6 +47,9 @@ class Vulkan : private utils::Uncopyable {
 		VkBuffer indexBuffer;
 		VkDeviceMemory indexBufferMemory;
 		VkCommandPool commandPool;
+		VkDescriptorSetLayout descriptorSetLayout;
+		std::vector<VkBuffer> uniformBuffers;
+		std::vector<VkDeviceMemory> uniformBuffersMemory;
 		bool frameBufferResized;
 		size_t currentFrame;
 		std::vector<VkSemaphore> imageAvailableSemaphores;
@@ -86,6 +92,7 @@ class Vulkan : private utils::Uncopyable {
 		void createLogicalDeviceAndQueue();
 		void createSurface();
 		void createImageViews();
+		void createUniformBuffers();
 		void createGraphicsPipeline();
 		void createFramebuffers();
 		void createCommandPool();
@@ -95,6 +102,8 @@ class Vulkan : private utils::Uncopyable {
 		void cleanupSwapChain();
 		void createVertexBuffer();
 		void createIndexBuffer();
+		void createDescriptorSetLayout();
+		void updateUniformBuffer(uint32_t);
 		void createBuffer(
 			VkDeviceSize, VkBufferUsageFlags, VkMemoryPropertyFlags, 
 			VkBuffer&, VkDeviceMemory&
@@ -146,6 +155,12 @@ struct SwapChainSupportDetails {
 	VkSurfaceCapabilitiesKHR capabilities;
 	std::vector<VkSurfaceFormatKHR> formats;
 	std::vector<VkPresentModeKHR> presentModes;
+};
+
+struct UniformBufferObject {
+    glm::mat4 model;
+    glm::mat4 view;
+    glm::mat4 proj;
 };
 
 #endif
