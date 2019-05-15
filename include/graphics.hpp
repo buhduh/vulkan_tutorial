@@ -7,6 +7,7 @@
 #include <chrono>
 
 #define GLM_FORCE_RADIANS
+#define GLM_FORCE_DEFAULT_ALIGNED_GENTYPES
 #include <glm/glm.hpp>
 #include <glm/gtc/matrix_transform.hpp>
 #include <vulkan/vulkan.h>
@@ -48,6 +49,8 @@ class Vulkan : private utils::Uncopyable {
 		VkDeviceMemory indexBufferMemory;
 		VkCommandPool commandPool;
 		VkDescriptorSetLayout descriptorSetLayout;
+		VkDescriptorPool descriptorPool;
+		std::vector<VkDescriptorSet> descriptorSets;
 		std::vector<VkBuffer> uniformBuffers;
 		std::vector<VkDeviceMemory> uniformBuffersMemory;
 		bool frameBufferResized;
@@ -104,6 +107,8 @@ class Vulkan : private utils::Uncopyable {
 		void createIndexBuffer();
 		void createDescriptorSetLayout();
 		void updateUniformBuffer(uint32_t);
+		void createDescriptorPool();
+		void createDescriptorSets();
 		void createBuffer(
 			VkDeviceSize, VkBufferUsageFlags, VkMemoryPropertyFlags, 
 			VkBuffer&, VkDeviceMemory&
@@ -158,9 +163,9 @@ struct SwapChainSupportDetails {
 };
 
 struct UniformBufferObject {
-    glm::mat4 model;
-    glm::mat4 view;
-    glm::mat4 proj;
+    alignas(16) glm::mat4 model;
+    alignas(16) glm::mat4 view;
+    alignas(16) glm::mat4 proj;
 };
 
 #endif

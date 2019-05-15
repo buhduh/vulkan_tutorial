@@ -69,6 +69,8 @@ Vulkan::Vulkan(Window& window)
 		, descriptorSetLayout(VK_NULL_HANDLE)
 		, uniformBuffers(0)
 		, uniformBuffersMemory(0)
+		, descriptorPool(VK_NULL_HANDLE)
+		, descriptorSets(0)
 		, window(window) {
 	this->debugger = (VkDebugUtilsMessengerEXT*) 
 		malloc(sizeof(VkDebugUtilsMessengerEXT));
@@ -87,6 +89,9 @@ Vulkan::Vulkan(Window& window)
 	createCommandPool();
 	createVertexBuffer();
 	createIndexBuffer();
+	createUniformBuffers();
+	createDescriptorPool();
+	createDescriptorSets();
 	createCommandBuffers();
 	createSyncObjects();
 }
@@ -109,6 +114,59 @@ Vulkan::~Vulkan() {
 	free(this->debugger);
 	vkDestroySurfaceKHR(this->instance, this->surface, nullptr);
 	vkDestroyInstance(this->instance, nullptr);
+}
+
+void Vulkan::createDescriptorSets() {
+	std::vector<VkDescriptorSetLayout> layouts(swapChainImages.size(), descriptorSetLayout);
+	VkDescriptorSetAllocateInfo allocInfo = {};
+	allocInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
+	allocInfo.descriptorPool = descriptorPool;
+	allocInfo.descriptorSetCount = static_cast<uint32_t>(swapChainImages.size());
+	allocInfo.pSetLayouts = layouts.data();
+	descriptorSets.resize(swapChainImages.size());
+	if(
+		vkAllocateDescriptorSets(
+			device, &allocInfo, descriptorSets.data()
+		) != VK_SUCCESS
+	) {
+		throw std::runtime_error("failed to allocate descriptor sets!");
+	}
+	for(size_t i = 0; i < swapChainImages.size(); i++) {
+		VkDescriptorBufferInfo bufferInfo = {};
+		bufferInfo.buffer = uniformBuffers[i];
+		bufferInfo.offset = 0;
+		bufferInfo.range = sizeof(UniformBufferObject);
+		VkWriteDescriptorSet descriptorWrite = {};
+		descriptorWrite.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+		descriptorWrite.dstSet = descriptorSets[i];
+		descriptorWrite.dstBinding = 0;
+		descriptorWrite.dstArrayElement = 0;
+		descriptorWrite.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+		descriptorWrite.descriptorCount = 1;
+		descriptorWrite.pBufferInfo = &bufferInfo;
+		descriptorWrite.pImageInfo = nullptr; // Optional
+		descriptorWrite.pTexelBufferView = nullptr; // Optional
+		vkUpdateDescriptorSets(device, 1, &descriptorWrite, 0, nullptr);
+	}
+}
+
+void Vulkan::createDescriptorPool() {
+	VkDescriptorPoolSize poolSize = {};
+	poolSize.type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+	poolSize.descriptorCount = static_cast<uint32_t>(swapChainImages.size());
+	VkDescriptorPoolCreateInfo poolInfo = {};
+	poolInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
+	poolInfo.poolSizeCount = 1;
+	poolInfo.pPoolSizes = &poolSize;
+	poolInfo.maxSets = static_cast<uint32_t>(swapChainImages.size());;
+	poolInfo.flags = 0;
+	if(
+		vkCreateDescriptorPool(
+			device, &poolInfo, nullptr, 
+			&descriptorPool) != VK_SUCCESS
+		) {
+		throw std::runtime_error("failed to create descriptor pool!");
+	}
 }
 
 void Vulkan::updateUniformBuffer(uint32_t currentImage) {
@@ -325,11 +383,12 @@ void Vulkan::cleanupSwapChain() {
 	for(auto i : swapChainImageViews) {
 		vkDestroyImageView(device, i, nullptr);
 	}
+	vkDestroySwapchainKHR(device, swapChain, nullptr);
 	for(size_t i = 0; i < swapChainImages.size(); ++i) {
 		vkDestroyBuffer(device, uniformBuffers[i], nullptr);
 		vkFreeMemory(device, uniformBuffersMemory[i], nullptr);
 	}
-	vkDestroySwapchainKHR(device, swapChain, nullptr);
+	vkDestroyDescriptorPool(device, descriptorPool, nullptr);
 }
 
 void Vulkan::recreateSwapChain() {
@@ -341,6 +400,7 @@ void Vulkan::recreateSwapChain() {
 	createGraphicsPipeline();
 	createFramebuffers();
 	createUniformBuffers();
+	createDescriptorPool();
 	createCommandBuffers();
 }
 
@@ -494,6 +554,10 @@ void Vulkan::createCommandBuffers() {
 		vkCmdBindVertexBuffers(commandBuffers[i], 0, 1, vertexBuffers, offsets);
 		vkCmdBindIndexBuffer(
 			commandBuffers[i], indexBuffer, 0, VK_INDEX_TYPE_UINT16
+		);
+		vkCmdBindDescriptorSets(
+			commandBuffers[i], VK_PIPELINE_BIND_POINT_GRAPHICS, 
+			pipelineLayout, 0, 1, &descriptorSets[i], 0, nullptr
 		);
 		vkCmdDrawIndexed(
 			commandBuffers[i], static_cast<uint32_t>(indices.size()), 
@@ -672,7 +736,7 @@ void Vulkan::createGraphicsPipeline() {
 	rasterizer.polygonMode = VK_POLYGON_MODE_FILL;
 	rasterizer.lineWidth = 1.0f;
 	rasterizer.cullMode = VK_CULL_MODE_BACK_BIT;
-	rasterizer.frontFace = VK_FRONT_FACE_CLOCKWISE;
+	rasterizer.frontFace = VK_FRONT_FACE_COUNTER_CLOCKWISE;
 	rasterizer.depthBiasEnable = VK_FALSE;
 	rasterizer.depthBiasConstantFactor = 0.0f; // Optional
 	rasterizer.depthBiasClamp = 0.0f; // Optional
