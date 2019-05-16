@@ -10,6 +10,8 @@ OBJ = $(patsubst src/%.cpp,build/%.o,$(SRC))
 EXE = bin/drone
 
 drone: $(EXE)
+	@echo "successfully compiled at $(EXE)"
+	@echo "Your environment may not be correctly configured, correct this by sourcing scripts/setenv.sh."
 
 $(EXE): $(OBJ)
 	g++ -g $(CFLAGS) -o $@ $^ $(LDFLAGS)
@@ -35,4 +37,4 @@ clean:
 clean_spikes:
 	rm -rf bin/*_spike
 
-.PHONY: test clean spike
+.PHONY: test clean spike env
